@@ -1,2 +1,2 @@
-# travel-bot
-Telegram bot to check cheapest travel tickets
+# pokedex-telegram-bot
+A pokedéx telegram bot
