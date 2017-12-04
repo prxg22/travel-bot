@@ -4,7 +4,6 @@
   "description": "A pokedéx telegram bot",
   "main": "index.js",
   "scripts": {
-    
     "start": "node index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -19,6 +18,9 @@
   },
   "homepage": "https://github.com/prxg22/travel-bot#readme",
   "dependencies": {
+    "moment": "^2.19.3",
+    "moment-weekdaysin": "^1.0.1",
+    "nightmare": "^2.10.0",
     "request": "^2.83.0",
     "request-promise": "^4.2.2",
     "telegram-bot-api": "^1.2.0"

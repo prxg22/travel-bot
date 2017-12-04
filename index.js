@@ -1,6 +1,7 @@
 // libs
 const TelegramBot = require('telegram-bot-api')
 const request = require('request-promise')
+
 const PersistentMap = require('./persistent-map')
 const Travel = require('./travel')
 const TravelMap = require('./travel-map')
@@ -84,6 +85,10 @@ bot.on('update', (update) => {
         botMessage('Where are you from?', chat)
         // init travel object
         updatingTravels.set(user.id, { _step: 0 })
+        return
+      case '/check_travel':
+        if (updatingTravels.get(user.id)) updatingTravels.delete(user.id)
+        checkTravel(user, chat)
         return
   }
 
@@ -227,6 +232,28 @@ const findCities = (travel, property, txt, chat, threshold) => {
     })
 }
 
+const findAirport = (txt) => {
+  return request(AIRPORTS_URL)
+  .then((airpots) => {
+    let regex = RegExp(formatText(txt))
+    airpots = JSON.parse(airpots)
+
+    return airpots
+    .map(airport => {
+      return {
+        name: airport.name,
+        code: airport.code,
+        city: airport.city,
+        icao: airport.icao
+      }
+
+    })
+    .filter((airport) =>
+    airport.city && regex.test(formatText(airport.city))
+  )
+})
+}
+
 const setCity = (travel, property, txt, chat) => {
   // airport option
   let option = parseInt(txt)
@@ -351,27 +378,14 @@ const setThreshold = (travel, txt, chat) => {
   travel._step++
 }
 
-// Airpot logic
-const findAirport = (txt) => {
-  return request(AIRPORTS_URL)
-    .then((airpots) => {
-      let regex = RegExp(formatText(txt))
-      airpots = JSON.parse(airpots)
+// Ticket logic
+const checkTravel = (user, chat) => {
+  let msg = `Ok, ${user.name}! I'll search your tickets,`
+  msg +=  `this process can take a while, please wait`
+  botMessage(msg, chat)
 
-      return airpots
-        .map(airport => {
-          return {
-            name: airport.name,
-            code: airport.code,
-            city: airport.city,
-            icao: airport.icao
-          }
-
-        })
-        .filter((airport) =>
-          airport.city && regex.test(formatText(airport.city))
-        )
-    })
+  let travels = travelMap.get(user.id)
+  travels[2].searchTickets()
 }
 
 // helpers
