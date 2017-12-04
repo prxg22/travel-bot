@@ -2,6 +2,8 @@
 const TelegramBot = require('telegram-bot-api')
 const request = require('request-promise')
 const PersistentMap = require('./persistent-map')
+const Travel = require('./travel')
+const TravelMap = require('./travel-map')
 
 // constants
 const telegramToken = process.env.BOT_TOKEN
@@ -46,6 +48,7 @@ const MONTHS_FORMAT = `\t✅ Jan mar Feb\n`
 // globals
 const travels = new PersistentMap('data/travels.json')
 const updatingTravels = new Map()
+const travelMap = new TravelMap(travels.data)
 const actualYear = new Date().getFullYear()
 
 // bot
@@ -87,14 +90,13 @@ bot.on('update', (update) => {
   // get user travel object
   let travel = updatingTravels.get(user.id);
   if (travel) {
-    saveAction(travel, message.text, chat)
-    console.log(travel)
+    saveAction(travel, message.text, user, chat)
     return
   }
 })
 
 // Travel object setting
-const saveAction = (travel, txt, chat) => {
+const saveAction = (travel, txt, user, chat) => {
   switch(travel._step) {
     case 0:
       findCities(travel, 'from', txt, chat)
@@ -174,6 +176,25 @@ const saveAction = (travel, txt, chat) => {
       msg += `Who much do you want to pay?\n`
       botMessage(msg, chat)
       travel._step++
+      break
+    case 17:
+      msg = `Wait until I create your travel search. Check the details: !\n\n`
+      msg += `Origin: ${travel.from.city} - ${travel.from.name} (${travel.from.code}) \n`
+      msg += `Destiny: ${travel.to.city} - ${travel.to.name} (${travel.to.code}) \n`
+      msg += `Days: ${travel.days}) \n`
+      msg += `Months: ${travel.months}) \n`
+      msg += `From: ${travel.initial}) - To: ${travel.final} \n`
+      msg += `threshold: ${travel.threshold} \n`
+
+      travelMap.set(user.id, new Travel(travel))
+
+      console.log(travelMap)
+
+      travels.save(travelMap)
+
+      botMessage(msg, chat)
+      break
+
   }
 }
 

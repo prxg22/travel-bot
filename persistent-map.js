@@ -13,7 +13,7 @@ class PersistentMap {
   }
 
   get data() {
-    return this.json ? new Map(JSON.parse(this.json)) : null
+    return this.json ? JSON.parse(this.json) : null
   }
 
   save(map) {
