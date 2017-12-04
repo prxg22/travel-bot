@@ -173,7 +173,7 @@ const saveAction = (travel, txt, user, chat) => {
       break
     case 15:
       msg = `I'll search from ${travel.initial} unitl ${travel.final}!\n`
-      msg += `Who much do you want to pay?\n`
+      msg += `How much do you want to pay?\n`
       botMessage(msg, chat)
       travel._step++
       break
@@ -186,7 +186,7 @@ const saveAction = (travel, txt, user, chat) => {
       msg += `From: ${travel.initial}) - To: ${travel.final} \n`
       msg += `threshold: ${travel.threshold} \n`
 
-      travelMap.set(user.id, new Travel(travel))
+      travelMap.addTravel(user.id, travel)
 
       console.log(travelMap)
 

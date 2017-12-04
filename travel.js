@@ -9,13 +9,8 @@ class Travel {
   }
 
   setDates() {
-    console.log(this.initial)
-    console.log(this.final)
-    console.log(this.period)
-    console.log(this.days)
-    console.log(this.months)
   }
 }
 
 
-module.exports = Travel 
+module.exports = Travel

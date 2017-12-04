@@ -3,19 +3,20 @@ const Travel = require('./travel')
 class TravelMap extends Map {
   constructor(obj) {
       super(obj)
-      console.log(this)
-      this.forEach(travels => console.log(travels))
+      this.forEach((travels, key) => {
+        this.set(key, travels.map((travel) => new Travel(travel)))
+      })
   }
 
-  set(key, val) {
-    let travel = this.get(key)
+  addTravel(user, travel) {
+    let travels = this.get(user)
 
-    if (travel) {
-      travel.push(val)
-      return
+    if (!travels) {
+      travels = []
+      super.set(user, travels)
     }
 
-    super.set(key, [val])
+    travels.push(new Travel(travel))
   }
 }
 
