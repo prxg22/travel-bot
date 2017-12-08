@@ -47,9 +47,9 @@ const MONTHS_FORMAT = `\t✅ Jan mar Feb\n`
 + `\t❌ Nov October December \n`
 
 // globals
-const travels = new PersistentMap('data/travels.json')
+const travelsPersistedMap = new PersistentMap('data/travels.json')
 const updatingTravels = new Map()
-const travelMap = new TravelMap(travels.data)
+const travelMap = new TravelMap(travelsPersistedMap.data)
 const actualYear = new Date().getFullYear()
 
 // bot
@@ -86,9 +86,9 @@ bot.on('update', (update) => {
         // init travel object
         updatingTravels.set(user.id, { _step: 0 })
         return
-      case '/check_travel':
+      case '/search_tickets':
         if (updatingTravels.get(user.id)) updatingTravels.delete(user.id)
-        checkTravel(user, chat)
+        searchTickets(user, chat)
         return
   }
 
@@ -192,10 +192,7 @@ const saveAction = (travel, txt, user, chat) => {
       msg += `threshold: ${travel.threshold} \n`
 
       travelMap.addTravel(user.id, travel)
-
-      console.log(travelMap)
-
-      travels.save(travelMap)
+      travelsPersistedMap.save(travelMap)
 
       botMessage(msg, chat)
       break
@@ -379,13 +376,26 @@ const setThreshold = (travel, txt, chat) => {
 }
 
 // Ticket logic
-const checkTravel = (user, chat) => {
+const searchTickets = (user, chat) => {
   let msg = `Ok, ${user.name}! I'll search your tickets,`
   msg +=  `this process can take a while, please wait`
   botMessage(msg, chat)
 
   let travels = travelMap.get(user.id)
-  travels[2].searchTickets()
+  if (!travels) {
+    botMessage(`No travels saved, ${user.name}`, chat)
+    return
+  }
+
+  travels.forEach((travel, index, travels) => {
+    [travel.depatureDates[0], travel.depatureDates[1]].forEach(date =>
+      travel.searchTicketOnDate(date)
+        .then(ticket => console.log(ticket))
+        .catch(e => {
+          console.log(`${e}\n${travel.from.city} ${travel.to.city} ${date.format("D-MM-YYYY")}`)
+        })
+    )
+  })
 }
 
 // helpers

@@ -60,13 +60,19 @@ class Travel {
         .filter(day => day > moment())
   }
 
-  searchTickets() {
-    console.log('iniciando pesquisa...')
+  searchTicketOnDate(date) {
+    console.log(`iniciando pesquisa... ${this.from.city} - ${this.to.city} - ${date.format('D-MM-YYYY')}`)
     let nightmare = new Nightmare()
-    nightmare
-      .goto(this.formatUrl(this.depatureDates[0]))
+    return nightmare
+      .goto(this.formatUrl(date))
       .evaluate(() => {
-        let ticket = {}
+        let ticket = {
+          price: 0,
+          airline: '',
+          depature: {departs: [], arrives: []},
+          arrival: {departs: [], arrives: []}
+        }
+
         let priceGroupContainer = document.querySelectorAll('.priceGroupContainer')
         let priceDiv = priceGroupContainer[0].querySelector('.airsearch.amount')
         priceDiv.removeChild(priceDiv.querySelector('.money'))
@@ -77,14 +83,50 @@ class Travel {
           .replace(/,/g, '.'))
 
         ticket.airline = priceGroupContainer[0].querySelector('.cia-name').innerHTML
+        ticket.depature.departs = []
+        ticket.depature.arrives = []
 
+        let departureDeparts = priceGroupContainer[0]
+        .querySelector('ul.departure')
+        .querySelectorAll('p.depart span')
 
+        let departureArrives = priceGroupContainer[0]
+        .querySelector('ul.departure')
+        .querySelectorAll('p.arrive span.time')
+
+        let arrivalDeparts = priceGroupContainer[0]
+        .querySelector('ul.arrival')
+        .querySelectorAll('p.depart span')
+
+        let arrivalArrives = priceGroupContainer[0]
+        .querySelector('ul.arrival')
+        .querySelectorAll('p.arrive span.time')
+
+        departureDeparts.forEach(depart => {
+          ticket.depature.departs.push(depart.innerHTML.trim())
+        })
+
+        departureArrives.forEach(arrive => {
+          ticket.depature.arrives.push(arrive.innerHTML.trim())
+        })
+
+        arrivalDeparts.forEach(depart => {
+          ticket.arrival.departs.push(depart.innerHTML.trim())
+        })
+
+        arrivalArrives.forEach(arrive => {
+          ticket.arrival.arrives.push(arrive.innerHTML.trim())
+        })
 
         return ticket
       })
       .end()
-      .then(data => console.log(data))
-      .catch(error => console.error(error))
+      .catch(e => {
+        console.log(`${this.from.city} ${this.to.city} ${date.format("D-MM-YYYY")}`)
+        console.log(e);
+        console.log(this.formatUrl(date));
+        return e
+      })
   }
 
   formatUrl(depatureDate) {
