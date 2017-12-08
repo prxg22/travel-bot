@@ -391,9 +391,6 @@ const searchTickets = (user, chat) => {
     [travel.depatureDates[0], travel.depatureDates[1]].forEach(date =>
       travel.searchTicketOnDate(date)
         .then(ticket => console.log(ticket))
-        .catch(e => {
-          console.log(`${e}\n${travel.from.city} ${travel.to.city} ${date.format("D-MM-YYYY")}`)
-        })
     )
   })
 }

@@ -61,10 +61,14 @@ class Travel {
   }
 
   searchTicketOnDate(date) {
-    console.log(`iniciando pesquisa... ${this.from.city} - ${this.to.city} - ${date.format('D-MM-YYYY')}`)
-    let nightmare = new Nightmare()
+    console.log(`iniciando pesquisa: ${this.from.city} - ${this.to.city} - ${date.format('D-MM-YYYY')}`)
+    let nightmare = new Nightmare({
+        executionTimeout: 60000,
+        show: true
+    })
     return nightmare
       .goto(this.formatUrl(date))
+      .wait('.priceGroupContainer')
       .evaluate(() => {
         let ticket = {
           price: 0,
@@ -125,7 +129,6 @@ class Travel {
         console.log(`${this.from.city} ${this.to.city} ${date.format("D-MM-YYYY")}`)
         console.log(e);
         console.log(this.formatUrl(date));
-        return e
       })
   }
 
@@ -134,7 +137,7 @@ class Travel {
       .replace(/{{to}}/g, this.to.code)
       .replace(/{{from}}/g, this.from.code)
       .replace(/{{date_going}}/g, depatureDate.format('D-MM-YYYY'))
-      .replace(/{{date_returning}}/g, depatureDate.add(this.period, 'day').format('D-MM-YYYY'))
+      .replace(/{{date_returning}}/g, moment(depatureDate).add(this.period, 'day').format('D-MM-YYYY'))
       .replace(/{{now}}/g, moment().format('D-MM-YYYY'))
   }
 }
