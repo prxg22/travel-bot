@@ -1,2 +1,2 @@
-# pokedex-telegram-bot
-A pokedéx telegram bot
+# Travel Bot
+Airline ticket alert telegram bot
