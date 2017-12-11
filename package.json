@@ -1,7 +1,7 @@
 {
   "name": "travel-bot",
   "version": "1.0.0",
-  "description": "A pokedéx telegram bot",
+  "description": "",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",

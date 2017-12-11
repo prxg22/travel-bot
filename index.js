@@ -2,12 +2,12 @@
 const TelegramBot = require('telegram-bot-api')
 const request = require('request-promise')
 
-const PersistentMap = require('./persistent-map')
 const Travel = require('./travel')
 const TravelMap = require('./travel-map')
 
 // constants
 const telegramToken = process.env.BOT_TOKEN
+const timer = 60000 * 180
 const AIRPORTS_URL = 'https://gist.githubusercontent.com/prxg22/2eafc8b75a1de6155439ecc4496e82db/raw/795aa439434e845231f870a40d809ff87b6c20ca/airports.json'
 const DAYS = [
   'mon',
@@ -47,10 +47,10 @@ const MONTHS_FORMAT = `\t✅ Jan mar Feb\n`
 + `\t❌ Nov October December \n`
 
 // globals
-const travelsPersistedMap = new PersistentMap('data/travels.json')
 const updatingTravels = new Map()
-const travelMap = new TravelMap(travelsPersistedMap.data)
+const travelMap = new TravelMap()
 const actualYear = new Date().getFullYear()
+
 
 // bot
 const bot = new TelegramBot({
@@ -60,13 +60,45 @@ const bot = new TelegramBot({
   }
 })
 
+// update travels interval
+setInterval(() => {
+  travelMap.update().then(() => {
+    travelMap.write()
+    report()
+  })
+  .catch(e => console.log(e))
+}, timer)
+
+travelMap.update()
+  .then(() => {
+    travelMap.write()
+    report()
+  })
+  .catch(e => console.log(e))
+
 const botMessage = (msg, chat) => {
   if (!msg || !chat) console.error('Insert msg and chat')
   bot.sendMessage({chat_id: chat, text: msg})
 }
 
+const report = () => {
+  travelMap.read()
+  travelMap.forEach((travels, user) => {
+    let msg = ''
+    const str = 'Hey, I found scome interesting tickets!!\n\n'
+    const str2 = 'I still didn\'t search this tickets!! I will soon have some time...\n'
+    for (t of travels.filter(t => t.trigger)) {
+      msg += t.toString() + '\n'
+    }
+
+    console.log(msg)
+    if (msg)
+      botMessage(str + msg, user)
+  })
+}
+
 bot.on('update', (update) => {
-  if (!update|| !update.message || update.message.chat.type !== 'private') return
+  if (!update || !update.message || update.message.chat.type !== 'private') return
 
   const message = update.message
   const chat = update.message.chat.id
@@ -79,16 +111,16 @@ bot.on('update', (update) => {
   switch (message.text) {
       case '/healthcheck':
         botMessage('I\'m alive!', chat)
-        if (updatingTravels.get(user.id)) updatingTravels.delete(user.id)
+        if (updatingTravels.has(user.id)) updatingTravels.delete(user.id)
         return
       case '/save':
         botMessage('Where are you from?', chat)
         // init travel object
         updatingTravels.set(user.id, { _step: 0 })
         return
-      case '/search_tickets':
-        if (updatingTravels.get(user.id)) updatingTravels.delete(user.id)
-        searchTickets(user, chat)
+      case '/check':
+        if (updatingTravels.has(user.id)) updatingTravels.delete(user.id)
+        report(user, chat)
         return
   }
 
@@ -98,6 +130,7 @@ bot.on('update', (update) => {
     saveAction(travel, message.text, user, chat)
     return
   }
+
 })
 
 // Travel object setting
@@ -185,14 +218,15 @@ const saveAction = (travel, txt, user, chat) => {
     case 17:
       msg = `Wait until I create your travel search. Check the details: !\n\n`
       msg += `Origin: ${travel.from.city} - ${travel.from.name} (${travel.from.code}) \n`
-      msg += `Destiny: ${travel.to.city} - ${travel.to.name} (${travel.to.code}) \n`
+      msg += `Destination: ${travel.to.city} - ${travel.to.name} (${travel.to.code}) \n`
       msg += `Days: ${travel.days}) \n`
       msg += `Months: ${travel.months}) \n`
       msg += `From: ${travel.initial}) - To: ${travel.final} \n`
       msg += `threshold: ${travel.threshold} \n`
 
-      travelMap.addTravel(user.id, travel)
-      travelsPersistedMap.save(travelMap)
+      travels = travelMap.get(user.id)
+      travels.push(new Travel(travel))
+      travelMap.write()
 
       botMessage(msg, chat)
       break
@@ -314,7 +348,7 @@ const setDays = (travel, txt, chat) => {
 
 const setMonths = (travel, txt, chat) => {
   let str = formatText(txt)
-  let regex = /^([a-z]{3}\s)*[a-z]{3}$/g
+  let regex = /^([a-z]{3}\s)*[aA-z]{3}$/g
   let err = !str || !regex.test(str) // check if format is ok
   let aux = !err ? str.split(' ') : []
   let months = aux
@@ -380,19 +414,6 @@ const searchTickets = (user, chat) => {
   let msg = `Ok, ${user.name}! I'll search your tickets,`
   msg +=  `this process can take a while, please wait`
   botMessage(msg, chat)
-
-  let travels = travelMap.get(user.id)
-  if (!travels) {
-    botMessage(`No travels saved, ${user.name}`, chat)
-    return
-  }
-
-  travels.forEach((travel, index, travels) => {
-    [travel.depatureDates[0], travel.depatureDates[1]].forEach(date =>
-      travel.searchTicketOnDate(date)
-        .then(ticket => console.log(ticket))
-    )
-  })
 }
 
 // helpers

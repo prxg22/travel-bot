@@ -1,23 +1,55 @@
+const fs = require('fs')
 const Travel = require('./travel')
 
-class TravelMap extends Map {
-  constructor(obj) {
-      super(obj)
-      this.forEach((travels, key) => {
-        this.set(key, travels.map((travel) => new Travel(travel)))
-      })
+let map = new Map()
+
+module.exports = class TravelMap {
+  constructor() {
+    this.read()
   }
 
-  addTravel(user, travel) {
-    let travels = this.get(user)
+  get(user) {
+    if (!map.has(user)) map.set(user, [])
+    return map.get(user)
+  }
 
-    if (!travels) {
-      travels = []
-      super.set(user, travels)
+  write() {
+    map.forEach(
+      (travels, index) => map.set(index, travels.filter(t => t.alive))
+    )
+    fs.writeFileSync(`data/travels.json`, JSON.stringify([...map]))
+  }
+
+  forEach(fn) {
+    return map.forEach((v, k, m) => fn(v, k, m))
+  }
+
+  read() {
+    const file = fs.readFileSync(`data/travels.json`, 'utf8')
+    map = file ? new Map(JSON.parse(file)) : new Map()
+    map.forEach( (travels, user) =>
+      map.set(user, travels.map(t => new Travel(t)))
+    )
+  }
+
+  update() {
+    let resultPromise = new Promise ((resolve, reject) => (true) ? resolve() : reject())
+
+    for (let user of map.keys()) {
+      resultPromise = resultPromise.then(() => this.updateUser(user))
     }
 
-    travels.push(new Travel(travel))
+    return resultPromise.then(() => this.write())
+  }
+
+  updateUser(user) {
+    let resultPromise = new Promise ((resolve, reject) => (true) ? resolve() : reject())
+
+    for(let travel of map.get(user)) {
+      resultPromise =resultPromise
+        .then(() => travel.update())      
+    }
+
+    return resultPromise
   }
 }
-
-module.exports = TravelMap

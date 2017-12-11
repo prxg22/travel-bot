@@ -34,111 +34,202 @@ class Travel {
     if (this._step) {
       delete(this._step)
     }
+
+
+    this.tickets = this.tickets || []
+    this.alive = true
+    this.trigger = !!this.trigger
+    if (this.lastUpdate)
+      this.lastUpdate = moment(this.lastUpdate)
   }
 
-  get depatureDates() {
-    let depatureDates = []
+  get departureDates() {
+    let departureDates = []
 
     for (let year = this.initial; year <= this.final; year++) {
       this.months.map(month => {
-        let monthDates = this.getDates(month, year)
-        depatureDates = [ ...depatureDates, ...monthDates ]
+        let monthDates = this.getWeekDaysOnMonth(month, year)
+        departureDates = [ ...departureDates, ...monthDates ]
         return month
       })
     }
 
-    return depatureDates
+    return departureDates.sort((d1, d2) => +d1 - +d2)
   }
 
-  getRoundTrip(depatureDate) {
-    return depatureDate.add(this.period, 'day')
+  getRoundTrip(departureDate) {
+    let roundTrip = moment(departureDate).add(this.period, 'day')
+    return roundTrip
   }
 
-  getDates(month, year) {
+  getWeekDaysOnMonth(month, year) {
     return moment(`${year}-${MONTHS_EXT[month]}-01`, 'YYYY-MM-D')
         .weekdaysInMonth(this.days.map(day => DAYS_EXT[day]))
         .filter(day => day > moment())
   }
 
-  searchTicketOnDate(date) {
-    console.log(`iniciando pesquisa: ${this.from.city} - ${this.to.city} - ${date.format('D-MM-YYYY')}`)
-    let nightmare = new Nightmare({
-        executionTimeout: 60000,
-        show: true
+  update() {
+    let promises = null
+    this.tickets = []
+    this.trigger = false
+
+    let departureDates = this.departureDates
+    for (let date of departureDates) {
+      console.log(`iniciando pesquisa ${this.from.city} - ${this.to.city} - ${date.format('D-MM-YY')}`)
+      if (!promises) { promises = this.searchTicket(date); continue }
+      promises = promises
+        .then((ticket) => {
+          this.tickets.push(ticket)
+          if(!ticket)
+            console.log(`erro ticket ${this.tickets.length} - ${this.from.city} - ${this.to.city}`)
+          else
+            console.log(`chegou ticket ${this.tickets.length} - ${this.from.city} - ${this.to.city}`)
+          return this.searchTicket(date)
+        })
+    }
+
+    return promises.then((ticket) => {
+      this.tickets.push(ticket)
+      this.alive = !!this.tickets.find(t => !!t)
+
+      // APAGAR
+      if(!ticket)
+        console.log(`erro ticket ${this.tickets.length} - ${this.from.city} - ${this.to.city}`)
+      else
+        console.log(`chegou ticket ${this.tickets.length} - ${this.from.city} - ${this.to.city}`)
+      console.log(`${this.from.city} - ${this.to.city} esta vivo: ${this.alive}`)
+      // APAGAR
+
+      this.lastUpdate = moment()
+      return this.alive
     })
-    return nightmare
-      .goto(this.formatUrl(date))
-      .wait('.priceGroupContainer')
-      .evaluate(() => {
-        let ticket = {
-          price: 0,
-          airline: '',
-          depature: {departs: [], arrives: []},
-          arrival: {departs: [], arrives: []}
-        }
-
-        let priceGroupContainer = document.querySelectorAll('.priceGroupContainer')
-        let priceDiv = priceGroupContainer[0].querySelector('.airsearch.amount')
-        priceDiv.removeChild(priceDiv.querySelector('.money'))
-        ticket.price = parseFloat(priceDiv
-          .innerHTML
-          .trim()
-          .replace(/\./g, '')
-          .replace(/,/g, '.'))
-
-        ticket.airline = priceGroupContainer[0].querySelector('.cia-name').innerHTML
-        ticket.depature.departs = []
-        ticket.depature.arrives = []
-
-        let departureDeparts = priceGroupContainer[0]
-        .querySelector('ul.departure')
-        .querySelectorAll('p.depart span')
-
-        let departureArrives = priceGroupContainer[0]
-        .querySelector('ul.departure')
-        .querySelectorAll('p.arrive span.time')
-
-        let arrivalDeparts = priceGroupContainer[0]
-        .querySelector('ul.arrival')
-        .querySelectorAll('p.depart span')
-
-        let arrivalArrives = priceGroupContainer[0]
-        .querySelector('ul.arrival')
-        .querySelectorAll('p.arrive span.time')
-
-        departureDeparts.forEach(depart => {
-          ticket.depature.departs.push(depart.innerHTML.trim())
-        })
-
-        departureArrives.forEach(arrive => {
-          ticket.depature.arrives.push(arrive.innerHTML.trim())
-        })
-
-        arrivalDeparts.forEach(depart => {
-          ticket.arrival.departs.push(depart.innerHTML.trim())
-        })
-
-        arrivalArrives.forEach(arrive => {
-          ticket.arrival.arrives.push(arrive.innerHTML.trim())
-        })
-
-        return ticket
-      })
-      .end()
-      .catch(e => {
-        console.log(`${this.from.city} ${this.to.city} ${date.format("D-MM-YYYY")}`)
-        console.log(e);
-        console.log(this.formatUrl(date));
-      })
   }
 
-  formatUrl(depatureDate) {
+  searchTicket(date) {
+    const url = this.formatUrl(date)
+    const nightmare = new Nightmare({ waitTimeout: 750, executionTimeout: 30000})
+    return nightmare
+    .goto(url)
+    .wait('.priceGroupContainer')
+    .evaluate(() => {
+      let ticket = {
+        price: 0,
+        airline: '',
+        departure: {departs: [], arrives: []},
+        arrival: {departs: [], arrives: []}
+      }
+
+      let priceGroupContainer = document.querySelectorAll('.priceGroupContainer')
+      let priceDiv = priceGroupContainer[0].querySelector('.airsearch.amount')
+      priceDiv.removeChild(priceDiv.querySelector('.money'))
+
+      ticket.price = parseFloat(
+        priceDiv.innerHTML
+          .trim()
+          .replace(/\./g, '')
+          .replace(/,/g, '.')
+      )
+
+      ticket.airline = priceGroupContainer[0].querySelector('.cia-name').innerHTML
+      ticket.departure.departs = []
+      ticket.departure.arrives = []
+
+      let departureDeparts = priceGroupContainer[0]
+      .querySelector('ul.departure')
+      .querySelectorAll('p.depart span.time')
+
+      let departureArrives = priceGroupContainer[0]
+      .querySelector('ul.departure')
+      .querySelectorAll('p.arrive span.time')
+
+      let arrivalDeparts = priceGroupContainer[0]
+      .querySelector('ul.arrival')
+      .querySelectorAll('p.depart span.time')
+
+      let arrivalArrives = priceGroupContainer[0]
+      .querySelector('ul.arrival')
+      .querySelectorAll('p.arrive span.time')
+
+      departureDeparts.forEach(depart => {
+        ticket.departure.departs.push(depart.innerHTML.trim())
+      })
+
+      departureArrives.forEach(arrive => {
+        ticket.departure.arrives.push(arrive.innerHTML.trim())
+      })
+
+      arrivalDeparts.forEach(depart => {
+        ticket.arrival.departs.push(depart.innerHTML.trim())
+      })
+
+      arrivalArrives.forEach(arrive => {
+        ticket.arrival.arrives.push(arrive.innerHTML.trim())
+      })
+
+      return ticket
+    })
+    .end()
+    .then(ticket => {
+      console.log(ticket)
+      ticket.url = url
+      ticket.date = moment(date)
+      this.trigger = this.trigger || ticket.price < this.threshold
+
+      return ticket
+    })
+    .catch((e) => {
+      console.log(e)
+      return false
+    })
+  }
+
+  formatUrl(departureDate) {
+    let date = moment(departureDate)
     return url
       .replace(/{{to}}/g, this.to.code)
       .replace(/{{from}}/g, this.from.code)
-      .replace(/{{date_going}}/g, depatureDate.format('D-MM-YYYY'))
-      .replace(/{{date_returning}}/g, moment(depatureDate).add(this.period, 'day').format('D-MM-YYYY'))
+      .replace(/{{date_going}}/g, date.format('D-MM-YYYY'))
+      .replace(/{{date_returning}}/g, this.getRoundTrip(date).format('D-MM-YYYY'))
       .replace(/{{now}}/g, moment().format('D-MM-YYYY'))
+  }
+
+  toString() {
+    let dates = this.departureDates
+    let travel = `${this.from.city} (${this.from.code}) - `
+    + `${this.to.city} (${this.to.code})\n`
+
+    if (this.tickets.length < 1 || !this.alive) return travel
+
+    this.tickets.forEach((ticket, index) => {
+      if (!ticket) return
+      let arriveDate = this.getRoundTrip(ticket.date)
+      console.log(ticket)
+      travel += `${dates[index].format('DD-MM-YYYY')}\t`
+        + `${this.getRoundTrip(dates[index]).format('DD-MM-YYYY')}\t`
+        + `R$${ticket.price}\t`
+        + `${ticket.airline}\t\n`
+
+        travel += `Departure time:\n`
+        for (let index in ticket.departure.departs) {
+          ticket.departure.departs[index] = moment(ticket.departure.departs[index], 'HH:mm')
+          ticket.departure.arrives[index] = moment(ticket.departure.arrives[index], 'HH:mm')
+          travel += `\t${ticket.departure.departs[index].format('HH:mm')} >\t`
+          travel += `${ticket.departure.arrives[index].format('HH:mm')}\t\n`
+        }
+
+        travel += `Return time:\n`
+        for (let index in ticket.arrival.departs) {
+          ticket.arrival.departs[index] = moment(ticket.arrival.departs[index], 'HH:mm')
+          ticket.arrival.arrives[index] = moment(ticket.arrival.arrives[index], 'HH:mm')
+          travel += `\t${ticket.arrival.departs[index].format('HH:mm')} >\t`
+          travel  += `${ticket.arrival.arrives[index].format('HH:mm')}\t\n`
+        }
+
+        travel += '\n'
+    })
+
+    travel += `last update: ${this.lastUpdate.format('DD/MM HH:mm')}\n\n`
+    return travel
   }
 }
 
